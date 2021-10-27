@@ -334,11 +334,9 @@ EOS
   
   ;; (with-handlers ((exn:fail? (lambda (exn) 
   ;;                              (hash 'error (exn-message exn)))))
-  (displayln
-    (jsexpr->string
+  (log-info
       (hasheq 'event "query_received"
-              'requestid (requestid)
-              'msg msg)))
+              'msg msg))
 
   (with-handlers ((exn:fail:resource?
                    (lambda (exn) 
@@ -441,11 +439,8 @@ EOS
   (define resp
     (parameterize ((requestid requestid0))
       (handler req)))
-  (displayln
-    (jsexpr->string
-      (hasheq 't (date->string (seconds->date (/ t0 1000) #f) #t)
-              'requestid requestid0
-              'request  (dict-request-fields req))))
+  (log-info
+      (hasheq 'request  (dict-request-fields req)))
 
   (struct-copy response resp (output
     (lambda (fd)
@@ -458,14 +453,11 @@ EOS
       ;; Let's use "structured logging" here to make it easier to search,
       ;; and do things like create CloudWatch metrics from CloudWatch Logs
       ;; filters (they have a syntax to extract things from JSON.)
-      (displayln
-        (jsexpr->string
-          (hasheq 't (date->string (seconds->date (/ t0 1000)) #t)
-                  'requestid requestid0
-                  'request  (dict-request-fields req)
+      (log-info
+          (hasheq 'request  (dict-request-fields req)
                   'response (hasheq 'code     (response-code resp)
                                     'headers  (headers->hasheq (response-headers resp))
-                                    'duration dur))))
+                                    'duration dur)))
       tmp))))
 
 (define ((logwrap-lazy handler) req)
