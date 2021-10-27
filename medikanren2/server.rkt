@@ -29,6 +29,21 @@
 
 (date-display-format 'iso-8601)
 
+(define (log-info t msg)
+  (define jsexpr
+    (if (hash? msg)
+      (hash-set msg
+        't t)
+      (hasheq
+        'msg msg
+        't t)))
+  (displayln
+    (jsexpr->string
+      (hash-set
+        jsexpr
+        't
+        t))))
+
 (define (alist-ref alist key default)
   (define kv (assoc key alist))
   (if kv (cdr kv) default))
@@ -298,12 +313,12 @@ EOS
   (define broad-results (hash-ref broad-response 'response))
   (define broad-results-count (length (hash-ref (hash-ref broad-results 'message hash-empty) 'results '())))
   (define broad-error-message (hash-ref broad-results 'detail #f)) ; not sure if this is stable - it isn't TRAPI
-  (pretty-print (format "Broad response:\n~s\n" (hash-ref broad-response 'status)))
-  (log-info log-key (format "Broad response:\n~s\n" (hash-ref broad-response 'status)))
-  (pretty-print (format "Headers: ~s\n" (hash-ref broad-response 'headers)))
-  (log-info log-key (format "Headers: ~s\n" (hash-ref broad-response 'headers)))
-  (pretty-print (format "Broad result size: ~s\n" broad-results-count))
-  (log-info log-key (format "Broad result size: ~s\n" broad-results-count))
+  (log-info log-key
+    (hasheq
+      'event "broad-response"
+      'status (hash-ref broad-response 'status)
+      'headers (hash-ref broad-response 'headers)
+      'result-size broad-results-count))
 
   ;; (log-info log-key (format "Broad results: ~s" broad-results))
   
@@ -324,10 +339,12 @@ EOS
         (let-values (((result cpu real gc) (time-apply (lambda () (trapi-response msg log-key)) '())))
           (let* ((local-results (car result))
                  (length-local (length (hash-ref  local-results 'results '()))))
-            (pretty-print (format "Query time [cpu time: ~s real time: ~s]" cpu real))
-            (log-info log-key (format "Query time [cpu time: ~s real time: ~s]" cpu real))
-            (pretty-print (format "Local results size: ~s" length-local))
-            (log-info log-key (format "Local results size: ~s" length-local))
+            (log-info log-key
+              (hasheq
+                'event "query_finished"
+                'cpu-time cpu
+                'real-time real
+                'num-results length-local))
             (values (hash-set*
                      (merge-results
                       (list (hash-ref (olift broad-results) 'message hash-empty)
