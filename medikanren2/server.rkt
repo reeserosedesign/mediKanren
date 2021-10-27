@@ -29,20 +29,31 @@
 
 (date-display-format 'iso-8601)
 
-(define (log-info t msg)
+(define (log-message level msg)
+  (define t (current-seconds))
+  (define st-t (date->string (seconds->date t #f) #t))
   (define jsexpr
     (if (hash? msg)
-      (hash-set msg
-        't t)
+      (hash-set
+        (hash-set
+          (hash-set msg
+            'level (symbol->string level))
+          'requestid (requestid))
+        't st-t)
       (hasheq
         'msg msg
-        't t)))
+        't st-t
+        'requestid (requestid)
+        'level (symbol->string level))))
   (displayln
-    (jsexpr->string
-      (hash-set
-        jsexpr
-        't
-        t))))
+    (jsexpr->string jsexpr))
+  (flush-output (current-output-port)))
+
+(define (log-info msg)
+  (log-message 'info msg))
+
+(define (log-error msg)
+  (log-message 'error msg))
 
 (define (alist-ref alist key default)
   (define kv (assoc key alist))
@@ -303,7 +314,6 @@ EOS
 
 
 (define (message->response msg)
-  (define log-key (current-seconds))
   (define broad-response (if (or
                                 (hash-ref msg 'disable_external_requests #f)
                                 (not (cfg:config-ref 'trapi-enable-external-requests?)))
@@ -313,7 +323,7 @@ EOS
   (define broad-results (hash-ref broad-response 'response))
   (define broad-results-count (length (hash-ref (hash-ref broad-results 'message hash-empty) 'results '())))
   (define broad-error-message (hash-ref broad-results 'detail #f)) ; not sure if this is stable - it isn't TRAPI
-  (log-info log-key
+  (log-info
     (hasheq
       'event "broad-response"
       'status (hash-ref broad-response 'status)
@@ -332,14 +342,14 @@ EOS
 
   (with-handlers ((exn:fail:resource?
                    (lambda (exn) 
-                     (log-error log-key (format "Error: ~a" exn))
+                     (log-error (format "Error: ~a" exn))
                      (error "Max query time exceded"))))
     (call-with-limits (query-time-limit) #f
       (lambda ()
-        (let-values (((result cpu real gc) (time-apply (lambda () (trapi-response msg log-key)) '())))
+        (let-values (((result cpu real gc) (time-apply (lambda () (trapi-response msg)) '())))
           (let* ((local-results (car result))
                  (length-local (length (hash-ref  local-results 'results '()))))
-            (log-info log-key
+            (log-info
               (hasheq
                 'event "query_finished"
                 'cpu-time cpu
